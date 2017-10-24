@@ -95,7 +95,9 @@ def setup_logging():
 
 
 def create_plot(window_title):
-    return plt.subplots(figsize=(10, 10), num=window_title)[1]
+    fig, ax = plt.subplots(figsize=(5, 5), num=window_title)
+    fig.tight_layout()
+    return ax
 
 
 def run_competition(args):
@@ -328,7 +330,7 @@ def render_board(board, plot):
             row, column = index_to_coords(index)
             color = white_color if board.owner[index] == Player.WHITE else black_color
             symbol = king_symbol if board.piece_class[index] == PieceClass.KING else man_symbol
-            plot.text(column - 1, row - 1, symbol, color=color, size=45, ha='center', va='center')
+            plot.text(column - 1, row - 1, symbol, color=color, size=25, ha='center', va='center')
 
     plt.pause(MOVE_VISUALIZATION_DELAY_SEC)
 
