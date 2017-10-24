@@ -25,5 +25,6 @@ def move():
 
 
 if __name__ == '__main__':
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 5000
-    app.run(port=port)
+    host = sys.argv[1] if len(sys.argv) > 2 else '127.0.0.1'
+    port = int(sys.argv[2]) if len(sys.argv) > 2 else 5000
+    app.run(host=host, port=port)
