@@ -21,7 +21,7 @@ from libcheckers.utils import index_to_coords
 
 MAX_MOVES = 100
 MOVE_VISUALIZATION_DELAY_SEC = 0.4
-GAME_OVER_VISUALIZATION_DELAY_SEC = 2
+GAME_OVER_VISUALIZATION_DELAY_SEC = 1.5
 
 logger = None
 run_timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
@@ -110,8 +110,8 @@ def run_competition(args):
     print('{0} Summary {0}'.format('-' * 25))
     for game_num, (moves, game_over_reason) in enumerate(game_history):
         msg = 'Game {0}: {1} turns, outcome: {2}'
-        outcome_name = ser.save_game_over_reason(game_over_reason)
-        print(msg.format(game_num + 1, math.ceil(len(moves) / 2.0 + 1), outcome_name))
+        outcome_name = get_reason_message(game_over_reason)
+        print(msg.format(game_num + 1, math.ceil(len(moves) / 2), outcome_name))
 
 
 def run_game(args, plot):
@@ -160,13 +160,16 @@ def replay_game(args):
 
     board = get_starting_board()
     render_board(board, plot)
+    plt.pause(GAME_OVER_VISUALIZATION_DELAY_SEC)
+
     for move_num, move in enumerate(moves):
         player_name = 'white' if not move_num % 2 else 'black'
-        logger.info('Move {0:3d}: {1} plays {2}'.format(move_num, player_name, move))
+        logger.info('Move {0:3d}: {1} plays {2}'.format(math.ceil((move_num + 1) / 2), player_name, move))
         board = move.apply(board)
         render_board(board, plot)
 
-    logger.info('Game over: {0}'.format(ser.save_game_over_reason(game_over_reason)))
+    logger.info('Game over: {0}'.format(get_reason_message(game_over_reason)))
+    plt.pause(GAME_OVER_VISUALIZATION_DELAY_SEC)
 
 
 def load_game(game_filename):
@@ -234,7 +237,7 @@ def get_player_move(move_num, board, player, server_url):
         logger.warning(msg)
         move = random.choice(allowed_moves)
 
-    logger.info('Move {0:3d}: {1} plays {2}'.format(move_num + 1, player_name, move))
+    logger.info('Move {0:3d}: {1} plays {2}'.format(move_num, player_name, move))
     return move
 
 
