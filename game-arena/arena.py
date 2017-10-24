@@ -20,15 +20,25 @@ from libcheckers.movement import Board
 from libcheckers.utils import index_to_coords
 
 
+# The minimum number of moves each player must make to consider the game a draw.
 MAX_MOVES = 100
+
+# GUI delay after visualizing each move.
 MOVE_VISUALIZATION_DELAY_SEC = 0.4
+
+# GUI delay before starting and ending each game.
 GAME_OVER_VISUALIZATION_DELAY_SEC = 1.5
+
 
 logger = None
 run_timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
 
 
 def parse_command_line_args(args):
+    """
+    Parse the command-line arguments into a structured object.
+    """
+
     parser = argparse.ArgumentParser(
         description='Checkers game arena runner',
         epilog='Example: arena.py compete --gui http://localhost:5001 http://localhost:5002',
@@ -89,6 +99,11 @@ def create_plot(window_title):
 
 
 def run_competition(args):
+    """
+    Run the arena in a 1v1 competition mode between the specified two AI servers
+    for the specified number of rounds.
+    """
+
     game_history = []
     plot = create_plot('Checkers Game Arena') if args.gui else None
 
@@ -122,6 +137,10 @@ def run_competition(args):
 
 
 def run_game(args, plot):
+    """
+    Run a single game of the 1v1 competition.
+    """
+
     board = get_starting_board()
     render_board(board, plot)
     moves = []
@@ -160,6 +179,10 @@ def run_game(args, plot):
 
 
 def replay_game(args):
+    """
+    Replay a previously saved game log file.
+    """
+
     logger.info('Replaying game: {0}'.format(args.replay_file))
 
     moves, game_over_reason = load_game(args.replay_file)
@@ -180,6 +203,10 @@ def replay_game(args):
 
 
 def load_game(game_filename):
+    """
+    Load the game moves and outcome from a replay file.
+    """
+
     with open(game_filename) as gf:
         game_data = json.load(gf)
     moves = [ser.load_move(move) for move in game_data['moves']]
@@ -188,6 +215,10 @@ def load_game(game_filename):
 
 
 def save_game(moves, game_over_reason, game_filename):
+    """
+    Save the game moves and outcome to a replay file.
+    """
+
     game_data = {
         'moves': [ser.save_move(move) for move in moves],
         'gameOverReason': ser.save_game_over_reason(game_over_reason),
@@ -197,6 +228,11 @@ def save_game(moves, game_over_reason, game_filename):
 
 
 def get_starting_board():
+    """
+    Get an instance of the checkers game board representing the initial
+    layout of the game pieces.
+    """
+
     board = Board()
     for index in range(31, 51):
         board.add_piece(index, Player.WHITE, PieceClass.MAN)
@@ -206,6 +242,10 @@ def get_starting_board():
 
 
 def get_player_move(move_num, board, player, server_url):
+    """
+    Fetch the next move from an AI server, or fall back to a random move if an error occurs.
+    """
+
     player_name = ser.save_player(player)
     allowed_moves = board.get_available_moves(player)
     move = None
@@ -258,6 +298,10 @@ def get_reason_message(game_over_reason):
 
 
 def render_board(board, plot):
+    """
+    Draw the game board and pieces on a GUI window.
+    """
+
     if not plot:
         # GUI is disabled.
         return
@@ -290,6 +334,10 @@ def render_board(board, plot):
 
 
 def main():
+    """
+    Arena entry point.
+    """
+
     args = parse_command_line_args(sys.argv[1:])
     setup_logging()
 
