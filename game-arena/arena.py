@@ -20,6 +20,9 @@ from libcheckers.movement import Board
 from libcheckers.utils import index_to_coords
 
 
+# How long we should wait for the server to come up with the next move.
+SERVER_REQUEST_TIMEOUT_SEC = 10
+
 # The minimum number of moves each player must make to consider the game a draw.
 MAX_MOVES = 100
 
@@ -259,7 +262,7 @@ def get_player_move(move_num, board, player, server_url):
     url = urljoin(server_url, 'move')
 
     try:
-        response = requests.post(url, json=payload)
+        response = requests.post(url, json=payload, timeout=SERVER_REQUEST_TIMEOUT_SEC)
         if response.status_code != 200:
             msg = ('Player {0}: server has responded with an unexpected status code: {1}. '
                    'Picking a random move instead')
