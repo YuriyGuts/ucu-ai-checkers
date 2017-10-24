@@ -6,6 +6,7 @@ import math
 import json
 import random
 import sys
+from collections import Counter
 from datetime import datetime
 from urllib.parse import urljoin
 
@@ -112,6 +113,12 @@ def run_competition(args):
         msg = 'Game {0}: {1} turns, outcome: {2}'
         outcome_name = get_reason_message(game_over_reason)
         print(msg.format(game_num + 1, math.ceil(len(moves) / 2), outcome_name))
+
+    outcome_counter = Counter(game_over_reason for _, game_over_reason in game_history)
+    print()
+    print('White wins:', outcome_counter[GameOverReason.WHITE_WON])
+    print('Black wins:', outcome_counter[GameOverReason.BLACK_WON])
+    print('Draws     :', outcome_counter[GameOverReason.DRAW])
 
 
 def run_game(args, plot):
