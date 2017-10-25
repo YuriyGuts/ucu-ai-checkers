@@ -325,12 +325,15 @@ def render_board(board, plot):
 
     white_color = '#F8F8F8'
     black_color = '#303030'
+    index_color = '#787878'
     man_symbol = '\u26c2'
     king_symbol = '\u26c3'
 
     for index in range(1, BoardConfig.total_squares + 1):
+        row, column = index_to_coords(index)
+        plot.text(column - 1.35, row - 0.65, str(index), color=index_color, size=7, ha='center', va='center')
+
         if board.owner[index]:
-            row, column = index_to_coords(index)
             color = white_color if board.owner[index] == Player.WHITE else black_color
             symbol = king_symbol if board.piece_class[index] == PieceClass.KING else man_symbol
             plot.text(column - 1, row - 1, symbol, color=color, size=25, ha='center', va='center')
