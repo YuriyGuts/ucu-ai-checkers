@@ -146,6 +146,13 @@ def run_game(args, plot):
     Run a single game of the 1v1 competition.
     """
 
+    def end_game(moves, reason, message=None):
+        msg = message if message else 'Game over: {0}'.format(get_reason_message(reason))
+        logger.info(msg)
+        if plot:
+            plt.pause(GAME_OVER_VISUALIZATION_DELAY_SEC)
+        return moves, reason
+
     board = get_starting_board()
     render_board(board, plot)
     moves = []
@@ -157,8 +164,7 @@ def run_game(args, plot):
         # White move.
         game_over = board.check_game_over(Player.WHITE)
         if game_over:
-            logger.info('Game over: {0}'.format(get_reason_message(game_over)))
-            return moves, GameOverReason.BLACK_WON
+            return end_game(moves, GameOverReason.BLACK_WON)
 
         white_move = get_player_move(move_number, board, Player.WHITE, args.white_server_url)
         moves.append(white_move)
@@ -168,19 +174,14 @@ def run_game(args, plot):
         # Black move.
         game_over = board.check_game_over(Player.BLACK)
         if game_over:
-            logger.info('Game over: {0}'.format(get_reason_message(game_over)))
-            return moves, GameOverReason.WHITE_WON
+            return end_game(moves, GameOverReason.WHITE_WON)
 
         black_move = get_player_move(move_number, board, Player.BLACK, args.black_server_url)
         moves.append(black_move)
         board = black_move.apply(board)
         render_board(board, plot)
 
-    logger.info('Game over: maximum limit of moves reached')
-    if plot:
-        plt.pause(GAME_OVER_VISUALIZATION_DELAY_SEC)
-
-    return moves, GameOverReason.DRAW
+    return end_game(moves, GameOverReason.DRAW, message='Game over: maximum limit of moves reached')
 
 
 def replay_game(args):
