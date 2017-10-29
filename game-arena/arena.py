@@ -27,7 +27,7 @@ SERVER_REQUEST_TIMEOUT_SEC = 10
 MAX_MOVES = 100
 
 # GUI delay after visualizing each move.
-MOVE_VISUALIZATION_DELAY_SEC = 0.4
+MOVE_VISUALIZATION_DELAY_SEC = 0.25
 
 # GUI delay before starting and ending each game.
 GAME_OVER_VISUALIZATION_DELAY_SEC = 1.5
@@ -174,8 +174,8 @@ def run_game(args, plot):
 
         white_move = get_player_move(move_number, board, Player.WHITE, args.white_server)
         moves.append(white_move)
+        render_move(board, plot, white_move)
         board = white_move.apply(board)
-        render_board(board, plot)
 
         # Black move.
         game_over = board.check_game_over(Player.BLACK)
@@ -184,8 +184,8 @@ def run_game(args, plot):
 
         black_move = get_player_move(move_number, board, Player.BLACK, args.black_server)
         moves.append(black_move)
+        render_move(board, plot, black_move)
         board = black_move.apply(board)
-        render_board(board, plot)
 
     return end_game(moves, GameOverReason.DRAW, message='Game over: maximum limit of moves reached')
 
@@ -208,8 +208,8 @@ def replay_game(args):
         player_name = 'white' if not move_num % 2 else 'black'
         turn_number = int(math.ceil((move_num + 1) / 2))
         logger.info('Move {0:3d}: {1} plays {2}'.format(turn_number, player_name, move))
+        render_move(board, plot, move)
         board = move.apply(board)
-        render_board(board, plot)
 
     logger.info('Game over: {0}'.format(get_reason_message(game_over_reason)))
     plt.pause(GAME_OVER_VISUALIZATION_DELAY_SEC)
@@ -360,6 +360,12 @@ def get_reason_message(game_over_reason):
         return 'draw'
 
 
+def get_piece_symbol(piece_class):
+    man_symbol = '\u26c2'
+    king_symbol = '\u26c3'
+    return king_symbol if piece_class == PieceClass.KING else man_symbol
+
+
 def render_board(board, plot):
     """
     Draw the game board and pieces on a GUI window.
@@ -377,6 +383,7 @@ def render_board(board, plot):
     board_matrix[::2, ::2] = 1.0
     board_matrix[1::2, 1::2] = 1.0
 
+    # Board background.
     plot.cla()
     plot.imshow(board_matrix, interpolation='nearest')
     plot.set(xticks=[], yticks=[])
@@ -384,18 +391,53 @@ def render_board(board, plot):
     white_color = '#F8F8F8'
     black_color = '#303030'
     index_color = '#787878'
-    man_symbol = '\u26c2'
-    king_symbol = '\u26c3'
 
     for index in range(1, BoardConfig.total_squares + 1):
+        # Square indexes.
         row, column = index_to_coords(index)
         plot.text(column - 1.35, row - 0.65, str(index), color=index_color, size=7, ha='center', va='center')
 
+        # Game pieces.
         if board.owner[index]:
             color = white_color if board.owner[index] == Player.WHITE else black_color
-            symbol = king_symbol if board.piece_class[index] == PieceClass.KING else man_symbol
+            symbol = get_piece_symbol(board.piece_class[index])
             plot.text(column - 1, row - 1, symbol, color=color, size=25, ha='center', va='center')
 
+    plt.pause(MOVE_VISUALIZATION_DELAY_SEC)
+
+
+def render_move(board, plot, move):
+    """
+    Pseudo-animate a single move as it is being applied to the board.
+    """
+
+    if not plot:
+        # GUI is disabled.
+        return
+
+    white_move_color = '#FFF080'
+    black_move_color = '#1878BA'
+
+    if isinstance(move, ComboCaptureMove):
+        for single_move in move.moves:
+            render_move(board, plot, single_move)
+            board = single_move.apply(board)
+        return
+
+    symbol = get_piece_symbol(board.piece_class[move.start_index])
+    color = white_move_color if board.owner[move.start_index] == Player.WHITE else black_move_color
+
+    # Move start.
+    row, column = index_to_coords(move.start_index)
+    plot.text(column - 1, row - 1, symbol, color=color, alpha=1.0, size=25, ha='center', va='center')
+
+    # Move end.
+    row, column = index_to_coords(move.end_index)
+    plot.text(column - 1, row - 1, symbol, color=color, alpha=0.5, size=25, ha='center', va='center')
+
+    plt.pause(MOVE_VISUALIZATION_DELAY_SEC)
+    new_board = move.apply(board)
+    render_board(new_board, plot)
     plt.pause(MOVE_VISUALIZATION_DELAY_SEC)
 
 
