@@ -16,7 +16,7 @@ import requests
 from libcheckers import BoardConfig
 from libcheckers import serialization as ser
 from libcheckers.enum import Player, PieceClass, GameOverReason
-from libcheckers.movement import Board
+from libcheckers.movement import Board, ForwardMove, CaptureMove, ComboCaptureMove
 from libcheckers.utils import index_to_coords
 
 
@@ -53,8 +53,14 @@ def parse_command_line_args(args):
         'compete',
         help='Run the arena in competitive mode between two player servers',
     )
-    compete_parser.add_argument('white_server_url', help='URL of the AI server playing white')
-    compete_parser.add_argument('black_server_url', help='URL of the AI server playing black')
+    compete_parser.add_argument(
+        'white_server',
+        help='URL of the AI server playing white (or "human" to play on keyboard)',
+    )
+    compete_parser.add_argument(
+        'black_server',
+        help='URL of the AI server playing black (or "human" to play on keyboard)',
+    )
     compete_parser.add_argument(
         '--num-games',
         metavar='n',
@@ -115,7 +121,7 @@ def run_competition(args):
     # Run the specified number of games.
     for game_num in range(args.num_games):
         msg = 'Starting game {0} of {1}, white: [{2}], black: [{3}]'
-        msg = msg.format(game_num + 1, args.num_games, args.white_server_url, args.black_server_url)
+        msg = msg.format(game_num + 1, args.num_games, args.white_server, args.black_server)
         logger.info(msg)
 
         # Run a single game.
@@ -166,7 +172,7 @@ def run_game(args, plot):
         if game_over:
             return end_game(moves, GameOverReason.BLACK_WON)
 
-        white_move = get_player_move(move_number, board, Player.WHITE, args.white_server_url)
+        white_move = get_player_move(move_number, board, Player.WHITE, args.white_server)
         moves.append(white_move)
         board = white_move.apply(board)
         render_board(board, plot)
@@ -176,7 +182,7 @@ def run_game(args, plot):
         if game_over:
             return end_game(moves, GameOverReason.WHITE_WON)
 
-        black_move = get_player_move(move_number, board, Player.BLACK, args.black_server_url)
+        black_move = get_player_move(move_number, board, Player.BLACK, args.black_server)
         moves.append(black_move)
         board = black_move.apply(board)
         render_board(board, plot)
@@ -200,7 +206,8 @@ def replay_game(args):
 
     for move_num, move in enumerate(moves):
         player_name = 'white' if not move_num % 2 else 'black'
-        logger.info('Move {0:3d}: {1} plays {2}'.format(math.ceil((move_num + 1) / 2), player_name, move))
+        turn_number = int(math.ceil((move_num + 1) / 2))
+        logger.info('Move {0:3d}: {1} plays {2}'.format(turn_number, player_name, move))
         board = move.apply(board)
         render_board(board, plot)
 
@@ -247,15 +254,71 @@ def get_starting_board():
     return board
 
 
-def get_player_move(move_num, board, player, server_url):
+def get_player_move(move_num, board, player, server):
     """
-    Fetch the next move from an AI server, or fall back to a random move if an error occurs.
+    Retrieve the next move from the keyboard input or an AI server.
+    Fall back to a random move if an error occurs.
+    """
+
+    allowed_moves = board.get_available_moves(player)
+
+    if server == 'human':
+        move = get_player_move_from_keyboard(board, player, allowed_moves)
+    else:
+        move = get_player_move_from_server(board, player, allowed_moves, server)
+
+    if move not in allowed_moves:
+        msg = ('Player {0} picked a move that is not allowed ({1}). '
+               'Picking a random move instead')
+        logger.warning(msg)
+        move = random.choice(allowed_moves)
+
+    logger.info('Move {0:3d}: {1} plays {2}'.format(move_num, get_player_name(player), move))
+    return move
+
+
+def get_player_move_from_keyboard(board, player, allowed_moves):
+    """
+    Receive the next move from the keyboard input.
+    """
+
+    def move_sort_key(move):
+        if isinstance(move, ForwardMove):
+            return move.start_index
+        if isinstance(move, CaptureMove):
+            return move.start_index
+        if isinstance(move, ComboCaptureMove):
+            return move.moves[0].start_index
+
+    # If we have only one available move, no need to ask the user to decide.
+    if len(allowed_moves) == 1:
+        return allowed_moves[0]
+
+    # List available moves, each having a unique number.
+    print()
+    print('Pick a move for {0}:'.format(get_player_name(player)))
+    sorted_moves = sorted(allowed_moves, key=move_sort_key)
+    for i, move in enumerate(sorted_moves):
+        print('{0:2d}) {1}'.format(i + 1, move))
+
+    # Ask for input until we get a valid selected move.
+    picked_move = None
+    while not picked_move:
+        try:
+            picked_number = input('Move number: ')
+            picked_move = sorted_moves[int(picked_number) - 1]
+        except Exception:
+            print('Input error: must pick a number from the list')
+
+    return picked_move
+
+
+def get_player_move_from_server(board, player, allowed_moves, server_url):
+    """
+    Retrieve and parse the next move from an AI server.
     """
 
     player_name = ser.save_player(player)
-    allowed_moves = board.get_available_moves(player)
-    move = None
-
     payload = {
         'board': ser.save_board(board),
         'playerTurn': player_name,
@@ -268,30 +331,24 @@ def get_player_move(move_num, board, player, server_url):
             msg = ('Player {0}: server has responded with an unexpected status code: {1}. '
                    'Picking a random move instead')
             logger.warning(msg.format(player_name, response.status_code, response.content))
-            move = random.choice(allowed_moves)
+            return random.choice(allowed_moves)
     except Exception as ex:
         msg = ('Player {0}: Error when requesting next move from the server: {1}. '
                'Picking a random move instead')
         logger.warning(msg.format(player_name, ex))
-        move = random.choice(allowed_moves)
+        return random.choice(allowed_moves)
 
-    if not move:
-        try:
-            move = ser.load_move(response.json())
-        except:
-            msg = ('Player {0}: Unable to parse the move returned by the server ({1}). '
-                   'Picking a random move instead')
-            logger.warning(msg.format(player_name, response.content))
-            move = random.choice(allowed_moves)
-
-    if move not in allowed_moves:
-        msg = ('Player {0} picked a move that is not allowed ({1}). '
+    try:
+        return ser.load_move(response.json())
+    except Exception:
+        msg = ('Player {0}: Unable to parse the move returned by the server ({1}). '
                'Picking a random move instead')
-        logger.warning(msg)
-        move = random.choice(allowed_moves)
+        logger.warning(msg.format(player_name, response.content))
+        return random.choice(allowed_moves)
 
-    logger.info('Move {0:3d}: {1} plays {2}'.format(move_num, player_name, move))
-    return move
+
+def get_player_name(player):
+    return ser.save_player(player)
 
 
 def get_reason_message(game_over_reason):
