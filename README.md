@@ -25,4 +25,6 @@ $ cd game-arena
 $ python arena.py compete --gui --num-games 5 http://localhost:5000 http://localhost:5000
 ```
 
+Note: on macOS, you might need to run `export MPLBACKEND=TkAgg` before running the arena (or set the backend permanently in `matplotlibrc`) in order for the GUI to work.
+
 ![ucu-ai-checkers](https://user-images.githubusercontent.com/2750531/32143627-fa839a28-bcb4-11e7-9d75-bf2698b7c193.gif)
